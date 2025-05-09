@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ler_depois/screens/home_screen.dart';
-
+import 'package:ler_depois/screens/onboarding_screen.dart'; // Importa a tela de onboarding
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -14,7 +13,8 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: const Color(0xFFfcfcfc),
       ),
-      home: const HomeScreen(),
+      home: const OnboardingScreen(), // Define a tela de onboarding como a tela inicial
     );
   }
 }
+

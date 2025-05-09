@@ -37,6 +37,11 @@ dependencies:
   cupertino_icons: ^1.0.6
   provider: ^6.1.2
   url_launcher: ^6.3.0
+  sqflite: ^2.3.3 # Ou a versão estável mais recente
+  path_provider: ^2.1.3 # Ou a versão estável mais recente
+  path: ^1.9.0 # Ou a versão estável mais recente
+  sqflite_common_ffi_web: ^0.4.3+1
+
 
 dev_dependencies:
   flutter_test:

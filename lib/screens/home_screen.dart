@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ler_depois/models/item_model.dart';
-//import 'package:ler_depois/repositories/item_repository.dart';
 import 'package:ler_depois/screens/add_item_screen.dart';
 import 'package:ler_depois/services/item_provider.dart';
 import 'package:provider/provider.dart';
@@ -10,242 +9,99 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  // ignore: library_private_types_in_public_api
+  _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
-  late TabController _tabController;
-  late List<ItemModel> _newsItems;
-  late List<ItemModel> _shoppingItems;
-  late List<ItemModel> _filteredNewsItems; // Lista filtrada para notícias
-  late List<ItemModel> _filteredShoppingItems; // Lista filtrada para compras
-  ItemModel? _editingItem; // Armazena o item a ser editado
-  String? _currentLink; // Armazena o link atual do item
-  bool _isSearching = false; // Indica se a pesquisa está ativa
-  final _searchController = TextEditingController(); // Controlador do campo de pesquisa
-  late AnimationController _animationController; // Controlador da animação
-  late Animation<double> _animation; // Animação para o campo de pesquisa
-  late FocusNode _searchFocusNode; // FocusNode para o campo de pesquisa
-  late TickerProvider _tickerProvider; // TickerProvider
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  ItemModel? _editingItem;
+  String? _currentLink;
 
-  ScrollController _scrollController = ScrollController(); // Controlador de scroll
+  // ScrollControllers para cada Tab
+  final ScrollController _newsScrollController = ScrollController();
+  final ScrollController _shoppingScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _tickerProvider = this; // Define o TickerProvider
-    _tabController = TabController(length: 2, vsync: _tickerProvider);
-    // Substitui o listener do itemRepository pelo listener do Provider:
-    Provider.of<ItemProvider>(context, listen: false).addListener(_updateItems);
-    WidgetsBinding.instance.addObserver(this);
-    _newsItems = Provider.of<ItemProvider>(context, listen: false).items
-        .where((item) => item.category == 'Notícias')
-        .toList();
-    _shoppingItems = Provider.of<ItemProvider>(context, listen: false).items
-        .where((item) => item.category == 'Compras')
-        .toList();
-    _filteredNewsItems = _newsItems; // Inicializa a lista filtrada de notícias
-    _filteredShoppingItems = _shoppingItems; // Inicializa a lista filtrada de compras
-
-    // Inicializa a animação do campo de pesquisa
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: _tickerProvider, // Usa o TickerProvider
-    );
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-
-    // Inicializa o FocusNode para o campo de pesquisa
-    _searchFocusNode = FocusNode();
+    // Não é mais necessário chamar _updateItems aqui se o ItemProvider carrega no construtor
+    // Apenas adicionamos o listener para o search controller
+    _searchController.addListener(() {
+      Provider.of<ItemProvider>(context, listen: false)
+          .updateFilteredItems(_searchController.text);
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    // Substitui o removeListener do itemRepository pelo do Provider:
-    Provider.of<ItemProvider>(context, listen: false).removeListener(_updateItems);
     _searchController.dispose();
-    _animationController.dispose();
-    _searchFocusNode.dispose(); // Descarte o FocusNode
-    _scrollController.dispose(); // Descarte o ScrollController
+    _newsScrollController.dispose();
+    _shoppingScrollController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF1A9D1F),
-        title: AnimatedBuilder(
-          animation: _animation,
-          builder: (context, child) {
-            return !_isSearching
-                ? Text(
-                    'Ler Depois',
-                    style: TextStyle(
-                      color: Color(0xFFfcfcfc),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : Container(
-                    height: 40,
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode, // Associa o FocusNode ao TextField
-                      cursorColor: Colors.white,
-                      decoration: InputDecoration(
-                        hintText: 'Pesquisar',
-                        hintStyle: TextStyle(color: Colors.white),
-                        border: InputBorder.none,
-                        prefixIcon: Icon(Icons.search, color: Colors.white),
-                      ),
-                      onChanged: (value) {
-                        _filterItems(value);
-                      },
-                      // Define o onTap para colocar o foco no campo de pesquisa ao ser tocado
-                      onTap: () {
-                        FocusScope.of(context).requestFocus(_searchFocusNode);
-                      },
-                    ),
-                  );
-          },
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-                if (_isSearching) {
-                  _animationController.forward();
-                  // Coloca o foco no campo de pesquisa usando o FocusNode
-                  FocusScope.of(context).requestFocus(_searchFocusNode);
-                } else {
-                  _animationController.reverse();
-                  _searchController.clear();
-                  _filteredNewsItems = _newsItems;
-                  _filteredShoppingItems = _shoppingItems;
-                }
-              });
-            },
-            icon: Icon(
-              _isSearching ? Icons.close : Icons.search,
-              color: Color(0xFFfcfcfc),
-            ),
-          ),
-        ],
-      ),
-      body: GestureDetector(
-        onTap: () {
-          // Fecha o campo de pesquisa quando a tela é tocada
-          if (_isSearching) {
-            setState(() {
-              _isSearching = false;
-              _animationController.reverse();
-              _searchController.clear();
-              _filteredNewsItems = _newsItems;
-              _filteredShoppingItems = _shoppingItems;
-            });
-          }
-        },
-        child: Column(
-          children: [
-            TabBar(
-              controller: _tabController,
-              labelColor: Color(0xFF333333),
-              unselectedLabelColor: Color(0xFF707070),
-              tabs: [
-                Tab(text: 'Notícias'),
-                Tab(text: 'Compras'),
-              ],
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Adiciona o ScrollController ao ListView.builder
-                  _buildItemList(_filteredNewsItems, _scrollController), // Usa a lista filtrada de notícias
-                  // Adiciona o ScrollController ao ListView.builder
-                  _buildItemList(_filteredShoppingItems, _scrollController), // Usa a lista filtrada de compras
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF1A9D1F),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddItemScreen()),
-          );
-        },
-        child: Icon(
-          Icons.add,
-          color: Color(0xFFfcfcfc),
-        ),
-      ),
-    );
-  }
-
-  void _filterItems(String query) {
-    if (query.isEmpty) {
-      _filteredNewsItems = _newsItems;
-      _filteredShoppingItems = _shoppingItems;
-    } else {
-      _filteredNewsItems = _newsItems
-          .where((item) => item.title.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-      _filteredShoppingItems = _shoppingItems
-          .where((item) => item.title.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+  Widget _buildItemList(
+      List<ItemModel> items, ScrollController scrollController) {
+    if (items.isEmpty) {
+      return const Center(child: Text("Nenhum item para exibir."));
     }
-    setState(() {});
-  }
-
-  Widget _buildItemList(List<ItemModel> items, ScrollController scrollController) {
     return ListView.builder(
-      controller: scrollController, // Define o ScrollController
+      controller: scrollController,
       itemCount: items.length,
       itemBuilder: (context, index) {
+        final item = items[index];
         return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
             onTap: () async {
-              if (await canLaunch(items[index].link)) {
-                await launch(items[index].link);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Link inválido.'),
-                  ),
-                );
+              if (mounted) {
+                if (item.link.isNotEmpty &&
+                    await canLaunchUrl(Uri.parse(item.link))) {
+                  await launchUrl(Uri.parse(item.link));
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Link inválido ou não pode ser aberto: ${item.link}'),
+                      ),
+                    );
+                  }
+                }
               }
             },
-            leading: Icon(items[index].icon),
+            leading: Icon(item.icon, color: const Color(0xFF1A9D1F)),
             title: Text(
-              items[index].title,
-              style: TextStyle(color: Color(0xFF333333)),
+              item.title,
+              style: const TextStyle(
+                  color: Color(0xFF333333), fontWeight: FontWeight.w500),
             ),
+            subtitle:
+                Text(item.category, style: TextStyle(color: Colors.grey[600])),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   onPressed: () {
-                    _editingItem = items[index];
+                    _editingItem = item; // item já tem o ID do banco
                     _currentLink = _editingItem?.link;
-                    _showEditDialog(context);
+                    _showEditDialog(context, item);
                   },
-                  icon: Icon(items[index].editIcon),
+                  icon: Icon(item.editIcon, color: Colors.blueGrey),
                 ),
                 IconButton(
                   onPressed: () {
-                    _showDeleteConfirmationDialog(index, items);
+                    if (item.id != null) {
+                      _showDeleteConfirmationDialog(context, item.id!);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Erro: Item sem ID para exclusão.')),
+                      );
+                    }
                   },
-                  icon: Icon(items[index].deleteIcon),
+                  icon: Icon(item.deleteIcon, color: Colors.redAccent),
                 ),
               ],
             ),
@@ -255,74 +111,83 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showEditDialog(BuildContext context) {
-    if (_editingItem != null) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Editar Item'),
-            content: Form(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    initialValue: _currentLink,
-                    onChanged: (value) {
-                      _currentLink = value;
-                      if (_editingItem != null) {
-                        _editingItem!.link = value;
-                        Provider.of<ItemProvider>(context, listen: false).updateItem(
-                            Provider.of<ItemProvider>(context, listen: false).items.indexOf(_editingItem!),
-                            _editingItem!
-                        );
-                        _updateItems();
-                      }
-                    },
-                    // ...
-                  ),
-                  // ... (outras informações a serem editadas)
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Text('Salvar'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    }
-  }
+  void _showEditDialog(BuildContext context, ItemModel currentItem) {
+    final TextEditingController linkController =
+        TextEditingController(text: currentItem.link);
+    final TextEditingController titleController =
+        TextEditingController(text: currentItem.title);
+    String selectedCategory = currentItem.category;
 
-  void _showDeleteConfirmationDialog(int index, List<ItemModel> items) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Excluir Item'),
-          content: Text('Tem certeza que deseja excluir este item?'),
+          title: const Text('Editar Item'),
+          content: SingleChildScrollView(
+            child: Form(
+              // Adicionar uma GlobalKey<FormState> se precisar de validação
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Título'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: linkController,
+                    decoration: const InputDecoration(labelText: 'Link'),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    hint: const Text('Categoria'),
+                    items: [
+                      'Notícias',
+                      'Compras'
+                    ] // Mantenha as categorias consistentes
+                        .map((category) => DropdownMenuItem(
+                              value: category,
+                              child: Text(category),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        selectedCategory = value;
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Não'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
             ),
-            TextButton(
-              onPressed: () {
-                // Obtendo o índice global corretamente do Provider
-                int globalIndex = Provider.of<ItemProvider>(context, listen: false)
-                    .items
-                    .indexOf(items[index]); 
-                Provider.of<ItemProvider>(context, listen: false)
-                    .deleteItem(globalIndex);
-                setState(() {});
+            ElevatedButton(
+              onPressed: () async {
+                final updatedItem = currentItem.copyWith(
+                  title: titleController.text,
+                  link: linkController.text,
+                  category: selectedCategory,
+                  // O ícone pode ser atualizado com base na nova categoria, se necessário
+                  icon: selectedCategory == 'Notícias'
+                      ? Icons.newspaper
+                      : Icons.shopping_cart,
+                );
+                // A operação de update agora é async
+                await Provider.of<ItemProvider>(context, listen: false)
+                    .updateItem(updatedItem);
                 Navigator.of(context).pop();
+                // O ItemProvider já notifica os listeners, então a UI deve atualizar
               },
-              child: Text('Sim'),
+              child: const Text('Salvar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A9D1F),
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         );
@@ -330,17 +195,114 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _updateItems() {
-    print("Atualizando a ListView");
-    setState(() {
-      _newsItems = Provider.of<ItemProvider>(context, listen: false).items
-          .where((item) => item.category == 'Notícias')
-          .toList();
-      _shoppingItems = Provider.of<ItemProvider>(context, listen: false).items
-          .where((item) => item.category == 'Compras')
-          .toList();
-      _filteredNewsItems = _newsItems;
-      _filteredShoppingItems = _shoppingItems;
-    });
+  void _showDeleteConfirmationDialog(BuildContext context, int itemId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Excluir Item'),
+          content: const Text('Tem certeza que deseja excluir este item?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Não'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // A operação de delete agora é async
+                await Provider.of<ItemProvider>(context, listen: false)
+                    .deleteItem(itemId);
+                Navigator.of(context).pop();
+                // O ItemProvider já notifica os listeners, então a UI deve atualizar
+              },
+              child: const Text('Sim'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Usar Consumer para reconstruir apenas as partes necessárias da UI quando o provider notificar
+    return Consumer<ItemProvider>(
+      builder: (context, itemProvider, child) {
+        final newsItems = itemProvider.filteredItems
+            .where((item) => item.category == 'Notícias')
+            .toList();
+        final shoppingItems = itemProvider.filteredItems
+            .where((item) => item.category == 'Compras')
+            .toList();
+
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF1A9D1F),
+              title: const Text(
+                'Ler Depois',
+                style: TextStyle(
+                  color: Color(0xFFfcfcfc),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              bottom: TabBar(
+                labelColor: const Color(0xFFfcfcfc),
+                unselectedLabelColor: Colors.grey[300],
+                indicatorColor: const Color(0xFFfcfcfc),
+                tabs: const [
+                  Tab(text: 'Notícias'),
+                  Tab(text: 'Compras'),
+                ],
+              ),
+            ),
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Pesquisar itens',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25.0),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildItemList(newsItems, _newsScrollController),
+                      _buildItemList(shoppingItems, _shoppingScrollController),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            floatingActionButton: FloatingActionButton(
+              backgroundColor: const Color(0xFF1A9D1F),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const AddItemScreen()),
+                ).then((_) {
+                  // O ItemProvider já deve recarregar e notificar após adicionar um item
+                  // Se a lista não atualizar automaticamente, pode ser necessário chamar _loadItems ou similar aqui
+                });
+              },
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
